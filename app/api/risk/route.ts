@@ -5,7 +5,7 @@ import { scoreOrderRisk, enhanceRiskAssessment, OrderRiskSignals } from '@/lib/f
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-internal-secret')
   if (secret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 }) 
   }
 
   const body: OrderRiskSignals = await req.json()

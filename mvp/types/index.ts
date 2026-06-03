@@ -90,6 +90,13 @@ export interface CustomerComm {
   direction: 'inbound' | 'outbound'
 }
 
+export interface CE30Assessment {
+  eligible: boolean
+  confidence: 'high' | 'medium' | 'low'
+  matching_elements: string[]
+  recommendation: string
+}
+
 export interface GeneratedResponse {
   summary: string
   evidence_strength: Severity
@@ -98,6 +105,7 @@ export interface GeneratedResponse {
   evidence_checklist: EvidenceItem[]
   key_arguments: string[]
   recommended_action: string
+  compelling_evidence_30: CE30Assessment | null
 }
 
 export interface EvidenceItem {

@@ -1,4 +1,4 @@
-import { ReasonCodeConfig } from '@/types'
+import { ReasonCodeConfig, CE30Assessment } from '@/types'
 
 export const REASON_CODES: ReasonCodeConfig[] = [
   // ── VISA ──────────────────────────────────────────────────────────────────
@@ -205,8 +205,6 @@ export const REASON_CODES: ReasonCodeConfig[] = [
     strategy: 'Show your transaction records proving a single charge only. Amex is strict about duplicate processing — if your records are clean, this is a strong win. Submit quickly given the 20-day Amex window.',
   },
 ]
-
-import { CE30Assessment } from '@/types'
 
 export function assessCE30(
   reasonCode: string,

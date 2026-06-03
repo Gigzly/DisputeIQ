@@ -95,9 +95,21 @@ export default function Dashboard() {
 
   const useDemoMode = async () => {
     setLoading(true)
-    const res = await fetch('/api/demo-store', { method: 'POST' })
+    const res = await fetch('/api/demo-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user?.email, user_id: user?.id }),
+    })
     if (res.ok) {
-      window.location.reload()
+      const { store } = await res.json()
+      setStore(store)
+      const dRes = await fetch(`/api/disputes?shop=${store.shop_domain}`)
+      if (dRes.ok) {
+        const dData = await dRes.json()
+        setDisputes(dData.disputes || [])
+        setStats(dData.stats || {})
+      }
+      setTab('disputes')
     }
     setLoading(false)
   }

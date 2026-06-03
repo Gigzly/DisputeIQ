@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServer, createSupabaseAdmin } from '@/lib/supabase'
+import { createSupabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-  const supabase = createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const { email, user_id } = await req.json()
+  if (!email || !user_id) return NextResponse.json({ error: 'Missing email or user_id' }, { status: 400 })
 
   const admin = createSupabaseAdmin()
 
   const { data: existing } = await admin
-    .from('shopify_stores').select('id,shop_domain').eq('owner_email', user.email).single()
+    .from('shopify_stores').select('id,shop_domain').eq('owner_email', email).single()
   if (existing) return NextResponse.json({ store: existing, demo: true })
 
-  const demoShop = `demo-${user.id.slice(0,8)}.myshopify.com`
+  const demoShop = `demo-${user_id.slice(0,8)}.myshopify.com`
   const { data: store } = await admin
     .from('shopify_stores')
-    .insert({ shop_domain:demoShop, access_token:'demo_token', owner_email:user.email, plan:'trial', win_rate:0.28, total_disputes:3, total_recovered:220 })
+    .insert({ shop_domain:demoShop, access_token:'demo_token', owner_email:email, plan:'trial', win_rate:0.28, total_disputes:3, total_recovered:220 })
     .select('id,shop_domain').single()
 
   if (store) {

@@ -92,6 +92,16 @@ export default function Dashboard() {
     window.location.href = '/auth/login'
   }
 
+
+  const useDemoMode = async () => {
+    setLoading(true)
+    const res = await fetch('/api/demo-store', { method: 'POST' })
+    if (res.ok) {
+      window.location.reload()
+    }
+    setLoading(false)
+  }
+
   const connectShopify = () => {
     let shop = shopUrl.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
     if (!shop.includes('.myshopify.com')) shop = `${shop}.myshopify.com`
@@ -159,13 +169,20 @@ export default function Dashboard() {
               </div>
               <p style={{fontSize:12,color:'#9ca3af',marginTop:8}}>Just the subdomain — e.g. "mystore" or "mystore.myshopify.com"</p>
             </div>
-            <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,padding:20}}>
+            <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,padding:20,marginBottom:16}}>
               <div style={{fontWeight:600,fontSize:14,color:'#15803d',marginBottom:10}}>What DisputeIQ can access</div>
               {['Read your orders and order details','Read shipping and fulfillment data','Read dispute notifications','Nothing else — read-only, cannot modify your store'].map((item,i) => (
                 <div key={i} style={{display:'flex',gap:8,fontSize:14,color:'#374151',padding:'4px 0'}}>
                   <span style={{color:'#16a34a',fontWeight:700}}>✓</span>{item}
                 </div>
               ))}
+            </div>
+            <div style={{borderTop:'1px solid #e5e7eb',paddingTop:20,textAlign:'center'}}>
+              <div style={{fontSize:14,color:'#6b7280',marginBottom:12}}>Don't have a Shopify store yet? Try with sample data first.</div>
+              <button onClick={useDemoMode}
+                style={{background:'none',border:'1.5px solid #e5e7eb',borderRadius:10,padding:'11px 22px',fontSize:14,fontWeight:500,cursor:'pointer',color:'#374151'}}>
+                Try demo mode →
+              </button>
             </div>
           </div>
         )}

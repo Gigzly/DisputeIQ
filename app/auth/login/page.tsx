@@ -2,15 +2,14 @@
 import { useState } from 'react'
 
 export default function Login() {
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [mode, setMode]           = useState<'magic'|'password'>('password')
-  const [sent, setSent]           = useState(false)
-  const [error, setError]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
 
   const handleAuth = async () => {
     if (!email.includes('@')) { setError('Enter a valid email'); return }
+    if (password.length < 6)  { setError('Password must be at least 6 characters'); return }
     setError('')
     setLoading(true)
     try {
@@ -19,28 +18,16 @@ export default function Login() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
-
-      if (mode === 'password') {
-        // Try sign in first
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-        if (signInError) {
-          // If user doesn't exist, sign them up
-          const { error: signUpError } = await supabase.auth.signUp({ email, password })
-          if (signUpError) { setError(signUpError.message); setLoading(false); return }
-        }
-        window.location.href = '/dashboard'
-      } else {
-        const { error: e } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard` },
-        })
-        if (e) { setError(e.message); setLoading(false); return }
-        setSent(true)
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) {
+        const { error: signUpError } = await supabase.auth.signUp({ email, password })
+        if (signUpError) { setError(signUpError.message); setLoading(false); return }
       }
+      window.location.replace('/dashboard')
     } catch (e: any) {
       setError(e.message)
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -50,48 +37,25 @@ export default function Login() {
           Dispute<span style={{ color:'#16a34a' }}>IQ</span>
         </div>
         <div style={{ fontSize:15, color:'#6b7280', marginBottom:28 }}>Sign in to your account</div>
-
-        {sent ? (
-          <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10, padding:'16px', textAlign:'center' }}>
-            <div style={{ fontSize:24, marginBottom:8 }}>✉️</div>
-            <div style={{ fontWeight:600, marginBottom:4 }}>Check your email</div>
-            <div style={{ fontSize:14, color:'#6b7280' }}>Magic link sent to <strong>{email}</strong></div>
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom:16 }}>
-              <label style={{ display:'block', fontSize:13, fontWeight:500, marginBottom:6 }}>Email address</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAuth()}
-                placeholder="you@yourstore.com"
-                style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'12px 14px', fontSize:14, outline:'none' }} />
-            </div>
-
-            {mode === 'password' && (
-              <div style={{ marginBottom:16 }}>
-                <label style={{ display:'block', fontSize:13, fontWeight:500, marginBottom:6 }}>Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAuth()}
-                  placeholder="Create a password"
-                  style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'12px 14px', fontSize:14, outline:'none' }} />
-              </div>
-            )}
-
-            {error && <div style={{ color:'#dc2626', fontSize:13, marginBottom:12 }}>{error}</div>}
-
-            <button onClick={handleAuth} disabled={loading}
-              style={{ width:'100%', background: loading ? '#86efac' : '#16a34a', color:'#fff', border:'none', borderRadius:10, padding:'13px', fontSize:15, fontWeight:600, cursor: loading ? 'not-allowed' : 'pointer', marginBottom:12 }}>
-              {loading ? 'Signing in...' : mode === 'password' ? 'Sign in / Create account' : 'Send magic link'}
-            </button>
-
-            <div style={{ textAlign:'center', fontSize:13, color:'#9ca3af' }}>
-              <button onClick={() => setMode(mode === 'password' ? 'magic' : 'password')}
-                style={{ background:'none', border:'none', color:'#16a34a', cursor:'pointer', fontSize:13, fontWeight:500 }}>
-                {mode === 'password' ? 'Use magic link instead' : 'Use password instead'}
-              </button>
-            </div>
-          </>
-        )}
+        <div style={{ marginBottom:16 }}>
+          <label style={{ display:'block', fontSize:13, fontWeight:500, marginBottom:6 }}>Email address</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAuth()}
+            placeholder="you@yourstore.com"
+            style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'12px 14px', fontSize:14, outline:'none' }} />
+        </div>
+        <div style={{ marginBottom:16 }}>
+          <label style={{ display:'block', fontSize:13, fontWeight:500, marginBottom:6 }}>Password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAuth()}
+            placeholder="Min 6 characters"
+            style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'12px 14px', fontSize:14, outline:'none' }} />
+        </div>
+        {error && <div style={{ color:'#dc2626', fontSize:13, marginBottom:12 }}>{error}</div>}
+        <button onClick={handleAuth} disabled={loading}
+          style={{ width:'100%', background: loading ? '#86efac' : '#16a34a', color:'#fff', border:'none', borderRadius:10, padding:'13px', fontSize:15, fontWeight:600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+          {loading ? 'Signing in...' : 'Sign in / Create account'}
+        </button>
       </div>
     </div>
   )

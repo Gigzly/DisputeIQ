@@ -29,7 +29,16 @@ export async function POST(req: NextRequest) {
     risk_factors:         assessment.risk_factors,
     protective_factors:   assessment.protective_factors,
     recommended_action:   finalRecommendation,
-  }).catch(() => {}) // non-fatal if table doesn't exist yet
+  try {
+    await admin.from('order_risk_assessments').insert({
+      order_id:             body.order_id,
+      risk_score:           assessment.risk_score,
+      risk_level:           assessment.risk_level,
+      risk_factors:         assessment.risk_factors,
+      protective_factors:   assessment.protective_factors,
+      recommended_action:   finalRecommendation,
+    })
+  } catch (_) {}
 
   return NextResponse.json({
     ...assessment,

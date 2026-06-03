@@ -21,6 +21,7 @@ type Dispute = {
     key_arguments: string[]
     recommended_action: string
     evidence_checklist: { item: string; available: boolean; required: boolean; importance: string }[]
+    compelling_evidence_30?: { eligible: boolean; confidence: string; matching_elements: string[]; recommendation: string } | null
   } | null
   created_at: string
 }
@@ -375,6 +376,36 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <>
+                      {/* CE3.0 banner — Visa 10.4 only */}
+                      {selected.generated_response.compelling_evidence_30 && (() => {
+                        const ce3 = selected.generated_response!.compelling_evidence_30!
+                        return (
+                          <div style={{ background: ce3.eligible ? '#f0fdf4' : '#fffbeb', border: `1px solid ${ce3.eligible ? '#bbf7d0' : '#fde68a'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                              <span style={{ fontSize: 14 }}>{ce3.eligible ? '⚡' : '⚠️'}</span>
+                              <span style={{ fontWeight: 700, fontSize: 12, color: ce3.eligible ? '#15803d' : '#92400e' }}>
+                                {ce3.eligible ? 'CE3.0 Eligible — automatic reversal pathway' : 'CE3.0 Not Eligible'}
+                              </span>
+                              <span style={{ fontSize: 10, color: ce3.eligible ? '#6b7280' : '#a16207', textTransform: 'uppercase', letterSpacing: '0.05em', marginLeft: 2 }}>
+                                Compelling Evidence 3.0
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12, color: ce3.eligible ? '#166534' : '#78350f', lineHeight: 1.55 }}>
+                              {ce3.recommendation}
+                            </div>
+                            {ce3.matching_elements.length > 0 && (
+                              <div style={{ marginTop: 8, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                                {ce3.matching_elements.map((el, i) => (
+                                  <span key={i} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: ce3.eligible ? '#bbf7d0' : '#fde68a', color: ce3.eligible ? '#15803d' : '#78350f', fontWeight: 600 }}>
+                                    {el}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
                       {/* Summary */}
                       <div style={{ background: '#f7f7f8', borderRadius: 10, padding: '12px 14px', marginBottom: 14, fontSize: 13, color: '#374151', lineHeight: 1.65 }}>
                         {selected.generated_response.summary}

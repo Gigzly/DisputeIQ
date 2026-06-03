@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { DisputeEvidence, GeneratedResponse, ReasonCodeConfig } from '@/types'
-import { getReasonCode, getWinProbability } from './reason-codes'
+import { getReasonCode, getWinProbability, assessCE30 } from './reason-codes'
 import { getAvailableEvidenceKeys } from './shopify'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -31,9 +31,10 @@ export async function generateDisputeResponse(
   currency: string
 ): Promise<GeneratedResponse> {
 
-  const rc = getReasonCode(reasonCode, network)
+  const rc           = getReasonCode(reasonCode, network)
   const availableKeys = getAvailableEvidenceKeys(evidence)
-  const winProb = getWinProbability(reasonCode, network, availableKeys)
+  const winProb       = getWinProbability(reasonCode, network, availableKeys)
+  const ce30          = assessCE30(reasonCode, network, availableKeys)
 
   const evidenceSummary = buildEvidenceSummary(evidence)
   const missingEvidence = rc
@@ -81,13 +82,14 @@ Generate a JSON response with this exact structure:
   try {
     const parsed = JSON.parse(clean)
     return {
-      summary:            parsed.summary || '',
-      evidence_strength:  parsed.evidence_strength || 'medium',
-      win_probability:    parsed.win_probability || winProb,
-      response_letter:    parsed.response_letter || '',
-      evidence_checklist: parsed.evidence_checklist || [],
-      key_arguments:      parsed.key_arguments || [],
-      recommended_action: parsed.recommended_action || 'Review and submit the response letter.',
+      summary:                 parsed.summary || '',
+      evidence_strength:       parsed.evidence_strength || 'medium',
+      win_probability:         parsed.win_probability || winProb,
+      response_letter:         parsed.response_letter || '',
+      evidence_checklist:      parsed.evidence_checklist || [],
+      key_arguments:           parsed.key_arguments || [],
+      recommended_action:      parsed.recommended_action || 'Review and submit the response letter.',
+      compelling_evidence_30:  ce30,
     }
   } catch (e) {
     throw new Error(`Failed to parse Claude response: ${e}`)

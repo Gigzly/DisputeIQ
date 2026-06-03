@@ -206,6 +206,52 @@ export const REASON_CODES: ReasonCodeConfig[] = [
   },
 ]
 
+import { CE30Assessment } from '@/types'
+
+export function assessCE30(
+  reasonCode: string,
+  network: string,
+  availableEvidence: string[]
+): CE30Assessment | null {
+  // CE3.0 only applies to Visa 10.4 (Card Absent Fraud)
+  if (network.toLowerCase() !== 'visa' || reasonCode !== '10.4') return null
+
+  // Count matching customer data elements available
+  const matchingElements: string[] = []
+  if (availableEvidence.includes('customer_email_match')) matchingElements.push('customer email')
+  if (availableEvidence.includes('ip_address'))            matchingElements.push('IP address')
+  if (availableEvidence.includes('device_id'))             matchingElements.push('device fingerprint')
+  if (availableEvidence.includes('avs_result'))            matchingElements.push('billing address (AVS)')
+
+  const hasPriorHistory = availableEvidence.includes('prior_purchase_history')
+
+  if (!hasPriorHistory) {
+    return {
+      eligible: false,
+      confidence: 'low',
+      matching_elements: matchingElements,
+      recommendation: 'CE3.0 not eligible: no prior purchase history from this card on record. Provide 2+ prior undisputed transactions from the same card to unlock this automatic-reversal pathway.',
+    }
+  }
+
+  if (matchingElements.length < 2) {
+    const have = matchingElements.length === 1 ? matchingElements[0] : 'none'
+    return {
+      eligible: false,
+      confidence: 'low',
+      matching_elements: matchingElements,
+      recommendation: `CE3.0 not eligible: requires 2+ matching customer data elements across prior transactions. Currently have: ${have}. Collect IP address, device fingerprint, or billing address data to qualify.`,
+    }
+  }
+
+  return {
+    eligible: true,
+    confidence: matchingElements.length >= 3 ? 'high' : 'medium',
+    matching_elements: matchingElements,
+    recommendation: `CE3.0 eligible — prior purchase history + ${matchingElements.join(' + ')} match qualifies for automatic chargeback reversal. Lead your response with this CE3.0 argument; it overrides standard fraud defences.`,
+  }
+}
+
 export function getReasonCode(code: string, network: string): ReasonCodeConfig | null {
   return REASON_CODES.find(
     rc => rc.code === code && rc.network === network.toLowerCase()

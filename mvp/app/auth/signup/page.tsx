@@ -20,7 +20,7 @@ export default function Signup() {
     // Try sign in (account may already exist)
     const { data: si, error: sie } = await supabase.auth.signInWithPassword({ email, password })
     if (!sie && si.session) { window.location.href = '/dashboard'; return }
-    setError(e?.message || 'Please disable email confirmation in Supabase Auth settings')
+    setError('Email confirmation required. Disable it in Supabase Auth settings.')
     setLoading(false)
   }
 

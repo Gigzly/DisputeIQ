@@ -5,103 +5,96 @@ import crypto from 'crypto'
 const SHOPIFY_API_KEY    = process.env.SHOPIFY_API_KEY!
 const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET!
 const APP_URL            = process.env.NEXT_PUBLIC_APP_URL!
+const SCOPES             = 'read_orders,read_fulfillments,read_customers,read_disputes'
 
-const SCOPES = 'read_orders,read_fulfillments,read_customers,read_disputes'
-
-// Step 1: Redirect merchant to Shopify OAuth
+// Handles both Step 1 (initiate) and Step 2 (callback) — Shopify always GETs callbacks
 export async function GET(req: NextRequest) {
-  const shop = req.nextUrl.searchParams.get('shop')
-  if (!shop) return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 })
+  const params = req.nextUrl.searchParams
+  const shop   = params.get('shop')
+  const code   = params.get('code')
+  const state  = params.get('state')
+  const hmac   = params.get('hmac')
 
+  // ── Step 2: OAuth callback (code present) ──────────────────────────────
+  if (code && shop && state && hmac) {
+    const storedState = req.cookies.get('shopify_state')?.value
+    if (state !== storedState) {
+      return NextResponse.json({ error: 'State mismatch — possible CSRF' }, { status: 403 })
+    }
+    if (!verifyHmac(params, hmac)) {
+      return NextResponse.json({ error: 'HMAC verification failed' }, { status: 403 })
+    }
+
+    // Exchange code for access token
+    const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: SHOPIFY_API_KEY, client_secret: SHOPIFY_API_SECRET, code }),
+    })
+    if (!tokenRes.ok) return NextResponse.json({ error: 'Token exchange failed' }, { status: 500 })
+    const { access_token } = await tokenRes.json()
+
+    // Upsert store in Supabase
+    const admin = createSupabaseAdmin()
+    const { data: existing } = await admin
+      .from('shopify_stores').select('id').eq('shop_domain', shop).single()
+
+    if (existing) {
+      await admin.from('shopify_stores')
+        .update({ access_token, updated_at: new Date().toISOString() })
+        .eq('shop_domain', shop)
+    } else {
+      await admin.from('shopify_stores').insert({
+        shop_domain: shop, access_token, plan: 'trial', credits_remaining: 5,
+      })
+    }
+
+    // Register webhooks (non-fatal)
+    await registerWebhooks(shop, access_token)
+
+    const response = NextResponse.redirect(`${APP_URL}/dashboard?shop=${shop}&installed=1`)
+    response.cookies.delete('shopify_state')
+    return response
+  }
+
+  // ── Step 1: Initiate OAuth ─────────────────────────────────────────────
+  if (!shop) return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 })
   const sanitized = sanitizeShop(shop)
   if (!sanitized) return NextResponse.json({ error: 'Invalid shop domain' }, { status: 400 })
 
-  const state    = crypto.randomBytes(16).toString('hex')
+  const nonce    = crypto.randomBytes(16).toString('hex')
   const redirect = `${APP_URL}/api/shopify-auth/callback`
-
-  const authUrl = `https://${sanitized}/admin/oauth/authorize?` +
-    `client_id=${SHOPIFY_API_KEY}&` +
-    `scope=${SCOPES}&` +
-    `redirect_uri=${encodeURIComponent(redirect)}&` +
-    `state=${state}`
+  const authUrl  =
+    `https://${sanitized}/admin/oauth/authorize?` +
+    `client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&` +
+    `redirect_uri=${encodeURIComponent(redirect)}&state=${nonce}`
 
   const response = NextResponse.redirect(authUrl)
-  response.cookies.set('shopify_state', state, { httpOnly: true, maxAge: 600 })
-  return response
-}
-
-// Step 2: Handle OAuth callback
-export async function POST(req: NextRequest) {
-  const params   = req.nextUrl.searchParams
-  const code     = params.get('code')
-  const shop     = params.get('shop')
-  const state    = params.get('state')
-  const hmac     = params.get('hmac')
-  const storedState = req.cookies.get('shopify_state')?.value
-
-  if (!code || !shop || !state || !hmac) {
-    return NextResponse.json({ error: 'Missing OAuth parameters' }, { status: 400 })
-  }
-  if (state !== storedState) {
-    return NextResponse.json({ error: 'State mismatch — possible CSRF' }, { status: 403 })
-  }
-  if (!verifyHmac(params, hmac)) {
-    return NextResponse.json({ error: 'HMAC verification failed' }, { status: 403 })
-  }
-
-  // Exchange code for access token
-  const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id:     SHOPIFY_API_KEY,
-      client_secret: SHOPIFY_API_SECRET,
-      code,
-    }),
+  response.cookies.set('shopify_state', nonce, {
+    httpOnly: true,
+    maxAge: 600,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
   })
-  if (!tokenRes.ok) return NextResponse.json({ error: 'Token exchange failed' }, { status: 500 })
-  const { access_token } = await tokenRes.json()
-
-  // Store shop in Supabase
-  const admin = createSupabaseAdmin()
-  const { data: existing } = await admin
-    .from('shopify_stores')
-    .select('id')
-    .eq('shop_domain', shop)
-    .single()
-
-  if (existing) {
-    await admin.from('shopify_stores')
-      .update({ access_token, updated_at: new Date().toISOString() })
-      .eq('shop_domain', shop)
-  } else {
-    await admin.from('shopify_stores').insert({
-      shop_domain:  shop,
-      access_token,
-      plan:         'trial',
-      credits_remaining: 5,
-    })
-  }
-
-  // Register webhooks
-  await registerWebhooks(shop, access_token)
-
-  const response = NextResponse.redirect(`${APP_URL}/dashboard?shop=${shop}&installed=1`)
-  response.cookies.delete('shopify_state')
   return response
 }
 
 async function registerWebhooks(shop: string, token: string) {
-  const webhooks = [
-    { topic: 'disputes/create', address: `${APP_URL}/api/shopify-webhook` },
-    { topic: 'disputes/update', address: `${APP_URL}/api/shopify-webhook` },
+  const topics = [
+    'disputes/create', 'disputes/update', 'orders/create',
   ]
-  for (const wh of webhooks) {
+  const endpoints: Record<string, string> = {
+    'disputes/create': `${APP_URL}/api/shopify-webhook`,
+    'disputes/update': `${APP_URL}/api/shopify-webhook`,
+    'orders/create':   `${APP_URL}/api/order-webhook`,
+  }
+  for (const topic of topics) {
     await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webhook: wh }),
-    }).catch(() => {}) // non-fatal
+      body: JSON.stringify({ webhook: { topic, address: endpoints[topic] } }),
+    }).catch(() => {})
   }
 }
 
@@ -116,10 +109,7 @@ function verifyHmac(params: URLSearchParams, hmac: string): boolean {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
-
-  const digest = crypto
-    .createHmac('sha256', SHOPIFY_API_SECRET)
-    .update(pairs)
-    .digest('hex')
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac))
+  const digest = crypto.createHmac('sha256', SHOPIFY_API_SECRET).update(pairs).digest('hex')
+  try { return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac)) }
+  catch { return false }
 }

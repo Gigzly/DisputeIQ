@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /analytics
+Disallow: /api/
+
+Sitemap: https://disputeiq.co/sitemap.xml

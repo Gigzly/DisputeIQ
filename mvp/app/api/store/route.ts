@@ -3,14 +3,18 @@ import { createSupabaseAdmin } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get('email')
-  if (!email) return NextResponse.json({ store: null })
+  const shop  = req.nextUrl.searchParams.get('shop')
+
+  if (!email && !shop) return NextResponse.json({ store: null })
 
   const admin = createSupabaseAdmin()
-  const { data: store } = await admin
+  const query = admin
     .from('shopify_stores')
     .select('id, shop_domain, plan, win_rate, total_disputes, total_recovered, owner_email')
-    .eq('owner_email', email)
-    .single()
+
+  const { data: store } = shop
+    ? await query.eq('shop_domain', shop).single()
+    : await query.eq('owner_email', email!).single()
 
   return NextResponse.json({ store: store || null })
 }

@@ -68,6 +68,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     const init = async () => {
+      // Shopify OAuth redirect lands here with ?shop=xxx — bypass login check
+      const shopParam = new URLSearchParams(window.location.search).get('shop')
+      if (shopParam) {
+        const shopRes = await fetch(`/api/store?shop=${encodeURIComponent(shopParam)}`)
+        if (shopRes.ok) {
+          const shopData = await shopRes.json()
+          if (shopData.store) {
+            setStore(shopData.store)
+            const dRes = await fetch(`/api/disputes?shop=${shopData.store.shop_domain}`)
+            if (dRes.ok) {
+              const dData = await dRes.json()
+              setDisputes(dData.disputes || [])
+              setStats(dData.stats || {})
+            }
+            setTab('disputes')
+            setLoading(false)
+            return
+          }
+        }
+      }
+
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,

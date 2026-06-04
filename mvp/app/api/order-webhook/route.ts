@@ -27,16 +27,20 @@ export async function POST(req: NextRequest) {
 
   // Store high-risk orders for prevention alerts
   if (riskScore >= 60) {
-    await admin.from('order_risk_flags').upsert({
-      store_id:      store.id,
-      order_id:      String(order.id),
-      order_number:  String(order.order_number),
-      amount:        parseFloat(order.total_price || '0'),
-      currency:      order.currency || 'USD',
-      risk_score:    riskScore,
-      risk_factors:  getRiskFactors(order),
-      created_at:    order.created_at || new Date().toISOString(),
-    }, { onConflict: 'order_id' }).catch(() => {}) // table may not exist yet — non-fatal
+    try {
+      await admin.from('order_risk_flags').upsert({
+        store_id:     store.id,
+        order_id:     String(order.id),
+        order_number: String(order.order_number),
+        amount:       parseFloat(order.total_price || '0'),
+        currency:     order.currency || 'USD',
+        risk_score:   riskScore,
+        risk_factors: getRiskFactors(order),
+        created_at:   order.created_at || new Date().toISOString(),
+      }, { onConflict: 'order_id' })
+    } catch {
+      // Table may not exist yet — non-fatal
+    }
   }
 
   return NextResponse.json({ received: true, risk_score: riskScore })

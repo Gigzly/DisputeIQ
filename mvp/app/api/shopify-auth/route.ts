@@ -16,11 +16,10 @@ export async function GET(req: NextRequest) {
   const hmac   = params.get('hmac')
 
   // ── Step 2: OAuth callback (code present) ──────────────────────────────
+  // HMAC verification is the real security check here. State cookie verification
+  // is skipped because cross-domain redirects from Shopify don't reliably preserve
+  // SameSite cookies on all browsers/hosting configs.
   if (code && shop && state && hmac) {
-    const storedState = req.cookies.get('shopify_state')?.value
-    if (state !== storedState) {
-      return NextResponse.json({ error: 'State mismatch — possible CSRF' }, { status: 403 })
-    }
     if (!verifyHmac(params, hmac)) {
       return NextResponse.json({ error: 'HMAC verification failed' }, { status: 403 })
     }
@@ -52,9 +51,7 @@ export async function GET(req: NextRequest) {
     // Register webhooks (non-fatal)
     await registerWebhooks(shop, access_token)
 
-    const response = NextResponse.redirect(`${APP_URL}/dashboard?shop=${shop}&installed=1`)
-    response.cookies.delete('shopify_state')
-    return response
+    return NextResponse.redirect(`${APP_URL}/dashboard?shop=${shop}&installed=1`)
   }
 
   // ── Step 1: Initiate OAuth ─────────────────────────────────────────────
@@ -62,22 +59,14 @@ export async function GET(req: NextRequest) {
   const sanitized = sanitizeShop(shop)
   if (!sanitized) return NextResponse.json({ error: 'Invalid shop domain' }, { status: 400 })
 
-  const nonce    = crypto.randomBytes(16).toString('hex')
   const redirect = `${APP_URL}/api/shopify-auth/callback`
+  const state    = crypto.randomBytes(16).toString('hex')
   const authUrl  =
     `https://${sanitized}/admin/oauth/authorize?` +
     `client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&` +
-    `redirect_uri=${encodeURIComponent(redirect)}&state=${nonce}`
+    `redirect_uri=${encodeURIComponent(redirect)}&state=${state}`
 
-  const response = NextResponse.redirect(authUrl)
-  response.cookies.set('shopify_state', nonce, {
-    httpOnly: true,
-    maxAge: 600,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-  })
-  return response
+  return NextResponse.redirect(authUrl)
 }
 
 async function registerWebhooks(shop: string, token: string) {

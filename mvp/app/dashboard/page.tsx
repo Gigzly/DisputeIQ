@@ -277,7 +277,7 @@ export default function Dashboard() {
           {([
             { id: 'disputes' as const, label: 'Disputes', icon: '🛡️', badge: openCount > 0 ? openCount : null, urgent: urgentDisps.length > 0 },
             { id: 'settings' as const, label: 'Settings', icon: '⚙️', badge: null, urgent: false },
-          ]).map(item => (
+          ] as const).map(item => (
             <button key={item.id} onClick={() => setTab(item.id)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8,
@@ -316,6 +316,18 @@ export default function Dashboard() {
         )}
 
         <div style={{ padding: '12px 12px 16px', borderTop: '1px solid #f3f4f6' }}>
+          {store && (
+            <a href={`/analytics`}
+              style={{ display: 'block', textAlign: 'center', background: '#f7f7f8', color: '#374151', padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 500, textDecoration: 'none', marginBottom: 6, border: '1px solid #e8e8e8' }}>
+              📊 Analytics
+            </a>
+          )}
+          {store && (
+            <a href={`/api/disputes/export?shop=${store.shop_domain}`}
+              style={{ display: 'block', textAlign: 'center', background: '#f7f7f8', color: '#374151', padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 500, textDecoration: 'none', marginBottom: 6, border: '1px solid #e8e8e8' }}>
+              ↓ Export CSV
+            </a>
+          )}
           <a href="/pricing" style={{ display: 'block', textAlign: 'center', background: '#16a34a', color: '#fff', padding: '9px', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none', marginBottom: 8 }}>
             Upgrade plan
           </a>

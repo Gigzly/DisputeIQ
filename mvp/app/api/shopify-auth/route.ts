@@ -59,12 +59,12 @@ export async function GET(req: NextRequest) {
   const sanitized = sanitizeShop(shop)
   if (!sanitized) return NextResponse.json({ error: 'Invalid shop domain' }, { status: 400 })
 
-  const redirect = `${APP_URL}/api/shopify-auth/callback`
-  const state    = crypto.randomBytes(16).toString('hex')
-  const authUrl  =
+  const redirect  = `${APP_URL}/api/shopify-auth/callback`
+  const nonce     = crypto.randomBytes(16).toString('hex')
+  const authUrl   =
     `https://${sanitized}/admin/oauth/authorize?` +
     `client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&` +
-    `redirect_uri=${encodeURIComponent(redirect)}&state=${state}`
+    `redirect_uri=${encodeURIComponent(redirect)}&state=${nonce}`
 
   return NextResponse.redirect(authUrl)
 }

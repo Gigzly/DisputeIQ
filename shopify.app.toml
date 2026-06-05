@@ -1,0 +1,15 @@
+name = "DisputeIQ"
+client_id = ""
+scopes = "read_orders,read_fulfillments,read_customers,read_disputes,read_shipping"
+embedded = false
+
+[webhooks]
+api_version = "2024-01"
+
+[auth]
+redirect_urls = [
+  "https://dispute-iq-wcev.vercel.app/api/shopify-auth/callback"
+]
+
+[pos]
+embedded = false

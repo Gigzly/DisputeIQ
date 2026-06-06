@@ -5,7 +5,7 @@ import crypto from 'crypto'
 const SHOPIFY_API_KEY    = process.env.SHOPIFY_API_KEY!
 const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET!
 const APP_URL            = process.env.NEXT_PUBLIC_APP_URL!
-const SCOPES             = 'read_orders,read_fulfillments,read_customers,read_disputes'
+const SCOPES             = 'read_orders,read_fulfillments,read_customers'
 
 // Handles both Step 1 (initiate) and Step 2 (callback) — Shopify always GETs callbacks
 export async function GET(req: NextRequest) {

@@ -107,19 +107,19 @@ export default function Home() {
             ))}
           </div>
           {[
-            { feature:'Reason code analysis',             manual:'❌ You research it', generic:'⚠️ Generic tips', ours:'✅ All 22 codes' },
-            { feature:'Evidence assembled automatically',  manual:'❌ You find it',    generic:'❌ None',         ours:'✅ From your order data' },
-            { feature:'Average win rate',                  manual:'30%',               generic:'35%',            ours:'62%' },
-            { feature:'Time to response',                  manual:'2–3 hours',         generic:'45 min',         ours:'60 seconds' },
-            { feature:'CE 3.0 detection',                  manual:'❌',               generic:'❌',             ours:'✅ Auto-detected' },
-            { feature:'Deadline reminders',                manual:'❌',               generic:'❌',             ours:'✅ 48h alerts' },
-            { feature:'Monthly cost',                      manual:'Free (time cost)',  generic:'~€30/mo',        ours:'€0 (free tier)' },
-          ].map((row, i) => (
+            { f:'Reason code analysis',             a:'❌ You research it', b:'⚠️ Generic tips', c:'✅ All 22 codes' },
+            { f:'Evidence assembled automatically',  a:'❌ You find it',    b:'❌ None',         c:'✅ From your order data' },
+            { f:'Average win rate',                  a:'30%',               b:'35%',            c:'62%' },
+            { f:'Time to response',                  a:'2–3 hours',         b:'45 min',         c:'60 seconds' },
+            { f:'CE 3.0 detection',                  a:'❌',               b:'❌',             c:'✅ Auto-detected' },
+            { f:'Deadline reminders',                a:'❌',               b:'❌',             c:'✅ 48h alerts' },
+            { f:'Monthly cost',                      a:'Free (time cost)',  b:'~€30/mo',        c:'€0 (free tier)' },
+          ].map(({ f, a, b, c }, i) => (
             <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'13px 22px', borderBottom:'1px solid #f3f4f6', background:'#fff', alignItems:'center' }}>
-              <div style={{ fontSize:14, color:'#374151', fontWeight:500 }}>{row.feature}</div>
-              <div style={{ fontSize:13, color:'#9ca3af', textAlign:'center' }}>{row.manual}</div>
-              <div style={{ fontSize:13, color:'#9ca3af', textAlign:'center' }}>{row.generic}</div>
-              <div style={{ fontSize:13, color:'#16a34a', fontWeight:600, textAlign:'center' }}>{row.ours}</div>
+              <div style={{ fontSize:14, color:'#374151', fontWeight:500 }}>{f}</div>
+              <div style={{ fontSize:13, color:'#9ca3af', textAlign:'center' }}>{a}</div>
+              <div style={{ fontSize:13, color:'#9ca3af', textAlign:'center' }}>{b}</div>
+              <div style={{ fontSize:13, color:'#16a34a', fontWeight:600, textAlign:'center' }}>{c}</div>
             </div>
           ))}
         </div>

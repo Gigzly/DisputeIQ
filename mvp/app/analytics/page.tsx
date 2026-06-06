@@ -23,6 +23,20 @@ export default function Analytics() {
 
   useEffect(() => {
     const init = async () => {
+      // Try sessionStorage first (set after OAuth or dashboard load)
+      const savedShop = sessionStorage.getItem('disputeiq_shop')
+      if (savedShop) {
+        setShop(savedShop)
+        const dRes = await fetch(`/api/disputes?shop=${savedShop}`)
+        if (dRes.ok) {
+          const d = await dRes.json()
+          setDisputes(d.disputes || [])
+        }
+        setLoading(false)
+        return
+      }
+
+      // Fallback: Supabase auth
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
       const { data: { user } } = await supabase.auth.getUser()
@@ -33,6 +47,7 @@ export default function Analytics() {
         const { store } = await res.json()
         if (store) {
           setShop(store.shop_domain)
+          sessionStorage.setItem('disputeiq_shop', store.shop_domain)
           const dRes = await fetch(`/api/disputes?shop=${store.shop_domain}`)
           if (dRes.ok) {
             const d = await dRes.json()
@@ -44,6 +59,28 @@ export default function Analytics() {
     }
     init()
   }, [])
+
+  // Second-pass fallback: if main load finished but shop is still empty, try sessionStorage → /api/store
+  useEffect(() => {
+    if (loading || shop) return
+    const savedShop = sessionStorage.getItem('disputeiq_shop') || localStorage.getItem('disputeiq_shop')
+    if (!savedShop) return
+    const tryFallback = async () => {
+      const res = await fetch(`/api/store?shop=${encodeURIComponent(savedShop)}`)
+      if (res.ok) {
+        const { store } = await res.json()
+        if (store) {
+          setShop(store.shop_domain)
+          const dRes = await fetch(`/api/disputes?shop=${encodeURIComponent(store.shop_domain)}`)
+          if (dRes.ok) {
+            const d = await dRes.json()
+            setDisputes(d.disputes || [])
+          }
+        }
+      }
+    }
+    tryFallback()
+  }, [loading, shop])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: '-apple-system,sans-serif', color: '#6b7280', flexDirection: 'column', gap: 12 }}>

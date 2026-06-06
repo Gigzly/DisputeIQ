@@ -69,13 +69,18 @@ export default function Dashboard() {
   useEffect(() => {
     const init = async () => {
       // Shopify OAuth redirect lands here with ?shop=xxx — bypass login check
-      const shopParam = new URLSearchParams(window.location.search).get('shop')
+      // Shopify OAuth redirect lands here with ?shop=xxx — bypass login check
+      const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      const shopParam    = searchParams?.get('shop') || null
       if (shopParam) {
         const shopRes = await fetch(`/api/store?shop=${encodeURIComponent(shopParam)}`)
         if (shopRes.ok) {
           const shopData = await shopRes.json()
           if (shopData.store) {
             setStore(shopData.store)
+            // Persist shop for other pages (disputes/new, analytics)
+            sessionStorage.setItem('disputeiq_shop', shopData.store.shop_domain)
+            localStorage.setItem('disputeiq_shop', shopData.store.shop_domain)
             const dRes = await fetch(`/api/disputes?shop=${shopData.store.shop_domain}`)
             if (dRes.ok) {
               const dData = await dRes.json()
@@ -103,6 +108,8 @@ export default function Dashboard() {
         const data = await res.json()
         if (data.store) {
           setStore(data.store)
+          sessionStorage.setItem('disputeiq_shop', data.store.shop_domain)
+          localStorage.setItem('disputeiq_shop', data.store.shop_domain)
           const dRes = await fetch(`/api/disputes?shop=${data.store.shop_domain}`)
           if (dRes.ok) {
             const dData = await dRes.json()
@@ -287,7 +294,7 @@ export default function Dashboard() {
       )}
 
       {/* Sidebar */}
-      <aside className="sidebar-fixed" style={{ width: 220, position: 'fixed', top: 0, left: 0, bottom: 0, background: '#fff', borderRight: '1px solid #e8e8e8', display: 'flex', flexDirection: 'column', zIndex: 40 }}>
+      <aside className="sidebar-fixed" style={{ width: 220, position: 'fixed', top: 0, left: 0, bottom: 0, background: '#fff', borderRight: '1px solid #e8e8e8', display: 'flex', flexDirection: 'column', zIndex: 40, transform: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'translateX(-220px)' : undefined }}>
         <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid #f3f4f6' }}>
           <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.5, color: '#111827' }}>
             Dispute<span style={{ color: '#16a34a' }}>IQ</span>

@@ -38,5 +38,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .eq('id', dispute.store_id)
   }
 
+  // Trigger commission calculation for free plan stores that just won
+  if (outcome === 'won') {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    fetch(`${appUrl}/api/commission`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dispute_id: params.id }),
+    }).catch(() => {})
+  }
+
   return NextResponse.json({ success: true })
 }

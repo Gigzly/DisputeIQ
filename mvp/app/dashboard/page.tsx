@@ -397,6 +397,23 @@ export default function Dashboard() {
               ))}
             </div>
 
+            {/* Free plan upgrade nudge */}
+            {store?.plan === 'free' && stats.recovered > 80 && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 2 }}>
+                    You've recovered ${stats.recovered.toLocaleString()} on the free plan
+                  </div>
+                  <div style={{ fontSize: 12, color: '#78350f' }}>
+                    Commission due: ~${Math.round(stats.recovered * 0.25).toLocaleString()}. Starter plan ($99/mo) saves money once you recover $396+/month.
+                  </div>
+                </div>
+                <a href="/pricing" style={{ background: '#f59e0b', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}>
+                  See plans →
+                </a>
+              </div>
+            )}
+
             {/* Urgent deadline banner */}
             {urgentDisps.length > 0 && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 12 }}>

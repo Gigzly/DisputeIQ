@@ -1,26 +1,34 @@
+'use client'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { Metadata } from 'next'
-
-export const metadata: Metadata = {
-  title: 'Chargeback Prevention for Shopify Merchants',
-  description: 'Stop chargebacks before they happen. Risk scoring, high-risk order detection, and prevention tips for Shopify merchants.',
-}
 
 const TIPS = [
   { icon: '📦', title: 'Add tracking to every order', impact: 'Very high', desc: 'Carrier tracking showing "Delivered" is the strongest evidence for not-received disputes (Visa 13.1, MC 4855). No tracking = near-certain loss if disputed.' },
   { icon: '✍️', title: 'Require signature on high-value orders', impact: 'High', desc: 'For orders over €200, signature confirmation eliminates not-received disputes entirely. The €4–6 cost is trivial vs the €50+ dispute fee.' },
-  { icon: '📧', title: 'Send delivery confirmation emails', impact: 'High', desc: 'When your carrier marks an order delivered, email the customer with the tracking link. This creates a paper trail that\'s powerful evidence in disputes.' },
+  { icon: '📧', title: 'Send delivery confirmation emails', impact: 'High', desc: "When your carrier marks an order delivered, email the customer with the tracking link. This creates a paper trail that's powerful evidence in disputes." },
   { icon: '🔒', title: 'Use 3D Secure (required under PSD2)', impact: 'Very high', desc: '3DS authentication is an automatic win for fraud disputes (Visa 10.4, MC 4837). Under EU PSD2, 3DS is mandatory for most e-commerce — make sure it\'s enabled.' },
   { icon: '📋', title: 'Show refund policy at checkout', impact: 'High', desc: 'Force customers to accept your refund policy at checkout. Screenshot it. This wins "credit not processed" disputes (Visa 13.6, Amex C02) when a refund wasn\'t owed.' },
   { icon: '💬', title: 'Log all customer communications', impact: 'Medium', desc: 'Every email and chat should be timestamped and logged. A customer who emailed after delivery without complaint is implicitly acknowledging receipt.' },
 ]
 
 export default function Prevention() {
+  const [hasShop, setHasShop] = useState(false)
+
+  useEffect(() => {
+    // No auth checks — just read localStorage. Never redirect or log out.
+    const shop = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
+    if (shop) setHasShop(true)
+  }, [])
+
   return (
     <div style={{ minHeight: '100vh', background: '#fff', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', color: '#111827' }}>
       <nav style={{ borderBottom: '1px solid #f3f4f6', padding: '0 40px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontWeight: 800, fontSize: 18, textDecoration: 'none', color: '#111827' }}>Dispute<span style={{ color: '#16a34a' }}>IQ</span></Link>
-        <Link href="/auth/signup" style={{ background: '#16a34a', color: '#fff', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Get started free</Link>
+        {hasShop ? (
+          <Link href="/dashboard" style={{ background: '#111827', color: '#fff', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Dashboard →</Link>
+        ) : (
+          <Link href="/auth/signup" style={{ background: '#16a34a', color: '#fff', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Get started free</Link>
+        )}
       </nav>
 
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '56px 24px 80px' }}>
@@ -54,12 +62,12 @@ export default function Prevention() {
 
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, overflow: 'hidden', marginBottom: 56 }}>
           {[
-            { signal: 'Billing and shipping countries differ',     risk: 'High', score: '+20' },
-            { signal: 'First-time customer on a high-value order', risk: 'High', score: '+25' },
-            { signal: 'Guest checkout (no account)',               risk: 'Medium', score: '+20' },
-            { signal: 'Order total exceeds €500',                  risk: 'Medium', score: '+10' },
-            { signal: '3+ high-risk orders in 24h',               risk: 'Critical', score: 'Alert' },
-            { signal: 'Repeat customer with 3+ prior orders',     risk: 'Low',  score: '−10' },
+            { signal: 'Billing and shipping countries differ',      risk: 'High',     score: '+20' },
+            { signal: 'First-time customer on a high-value order',  risk: 'High',     score: '+25' },
+            { signal: 'Guest checkout (no account)',                risk: 'Medium',   score: '+20' },
+            { signal: 'Order total exceeds €500',                   risk: 'Medium',   score: '+10' },
+            { signal: '3+ high-risk orders in 24h',                risk: 'Critical', score: 'Alert' },
+            { signal: 'Repeat customer with 3+ prior orders',      risk: 'Low',      score: '−10' },
           ].map((row, i, arr) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px', padding: '14px 20px', borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none', background: '#fff', alignItems: 'center' }}>
               <div style={{ fontSize: 14, color: '#374151' }}>{row.signal}</div>
@@ -108,8 +116,8 @@ export default function Prevention() {
           <p style={{ fontSize: 15, color: '#9ca3af', lineHeight: 1.7, marginBottom: 28 }}>
             Even the best prevention can't stop all chargebacks. When one gets through, DisputeIQ detects it automatically and generates the correct response — matched to the exact reason code — before you even see the email.
           </p>
-          <Link href="/auth/signup" style={{ background: '#16a34a', color: '#fff', padding: '13px 28px', borderRadius: 9, fontSize: 14, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
-            Start free →
+          <Link href={hasShop ? '/dashboard' : '/auth/signup'} style={{ background: '#16a34a', color: '#fff', padding: '13px 28px', borderRadius: 9, fontSize: 14, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>
+            {hasShop ? 'Go to dashboard →' : 'Start free →'}
           </Link>
         </div>
       </div>

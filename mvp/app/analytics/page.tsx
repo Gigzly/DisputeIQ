@@ -23,47 +23,60 @@ export default function Analytics() {
 
   useEffect(() => {
     const init = async () => {
-      // Try sessionStorage first (set after OAuth or dashboard load)
-      const savedShop = sessionStorage.getItem('disputeiq_shop')
-      if (savedShop) {
-        setShop(savedShop)
-        const dRes = await fetch(`/api/disputes?shop=${savedShop}`)
-        if (dRes.ok) {
-          const d = await dRes.json()
-          setDisputes(d.disputes || [])
-        }
-        setLoading(false)
-        return
-      }
-
-      // Fallback: Supabase auth
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      // 1. Try Supabase session → user_id lookup
+      const { createSupabaseClientSide } = await import('@/lib/supabase-client')
+      const supabase = createSupabaseClientSide()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/auth/login'; return }
 
-      const res = await fetch(`/api/store?email=${encodeURIComponent(user.email || '')}`)
-      if (res.ok) {
-        const { store } = await res.json()
-        if (store) {
-          setShop(store.shop_domain)
-          sessionStorage.setItem('disputeiq_shop', store.shop_domain)
-          const dRes = await fetch(`/api/disputes?shop=${store.shop_domain}`)
-          if (dRes.ok) {
-            const d = await dRes.json()
-            setDisputes(d.disputes || [])
+      if (user) {
+        const r1 = await fetch(`/api/store?user_id=${encodeURIComponent(user.id)}`)
+        if (r1.ok) {
+          const { store } = await r1.json()
+          if (store) {
+            setShop(store.shop_domain)
+            sessionStorage.setItem('disputeiq_shop', store.shop_domain)
+            localStorage.setItem('disputeiq_shop', store.shop_domain)
+            const dRes = await fetch(`/api/disputes?shop=${encodeURIComponent(store.shop_domain)}`)
+            if (dRes.ok) setDisputes((await dRes.json()).disputes || [])
+            setLoading(false)
+            return
+          }
+        }
+        // Email fallback within auth
+        if (user.email) {
+          const r2 = await fetch(`/api/store?email=${encodeURIComponent(user.email)}`)
+          if (r2.ok) {
+            const { store } = await r2.json()
+            if (store) {
+              setShop(store.shop_domain)
+              sessionStorage.setItem('disputeiq_shop', store.shop_domain)
+              localStorage.setItem('disputeiq_shop', store.shop_domain)
+              const dRes = await fetch(`/api/disputes?shop=${encodeURIComponent(store.shop_domain)}`)
+              if (dRes.ok) setDisputes((await dRes.json()).disputes || [])
+              setLoading(false)
+              return
+            }
           }
         }
       }
+
+      // 2. localStorage / sessionStorage fallback — no redirect to login
+      const savedShop = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
+      if (savedShop) {
+        setShop(savedShop)
+        const dRes = await fetch(`/api/disputes?shop=${encodeURIComponent(savedShop)}`)
+        if (dRes.ok) setDisputes((await dRes.json()).disputes || [])
+      }
+
       setLoading(false)
     }
     init()
   }, [])
 
-  // Second-pass fallback: if main load finished but shop is still empty, try sessionStorage → /api/store
+  // Second-pass: if still no shop after load, try storage → /api/store
   useEffect(() => {
     if (loading || shop) return
-    const savedShop = sessionStorage.getItem('disputeiq_shop') || localStorage.getItem('disputeiq_shop')
+    const savedShop = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
     if (!savedShop) return
     const tryFallback = async () => {
       const res = await fetch(`/api/store?shop=${encodeURIComponent(savedShop)}`)
@@ -72,10 +85,7 @@ export default function Analytics() {
         if (store) {
           setShop(store.shop_domain)
           const dRes = await fetch(`/api/disputes?shop=${encodeURIComponent(store.shop_domain)}`)
-          if (dRes.ok) {
-            const d = await dRes.json()
-            setDisputes(d.disputes || [])
-          }
+          if (dRes.ok) setDisputes((await dRes.json()).disputes || [])
         }
       }
     }
@@ -89,22 +99,19 @@ export default function Analytics() {
     </div>
   )
 
-  const resolved     = disputes.filter(d => d.outcome)
-  const won          = disputes.filter(d => d.outcome === 'won')
-  const lost         = disputes.filter(d => d.outcome === 'lost')
-  const winRate      = resolved.length > 0 ? Math.round((won.length / resolved.length) * 100) : 0
+  const resolved      = disputes.filter(d => d.outcome)
+  const won           = disputes.filter(d => d.outcome === 'won')
+  const winRate       = resolved.length > 0 ? Math.round((won.length / resolved.length) * 100) : 0
   const totalDisputed = disputes.reduce((s, d) => s + (d.amount || 0), 0)
-  const recovered    = won.reduce((s, d) => s + (d.amount || 0), 0)
+  const recovered     = won.reduce((s, d) => s + (d.amount || 0), 0)
 
-  // Win rate by network
-  const networks = ['visa', 'mastercard', 'amex']
+  const networks  = ['visa', 'mastercard', 'amex']
   const byNetwork = networks.map(net => {
-    const netDisputes = resolved.filter(d => (d.network || '').toLowerCase() === net)
-    const netWon      = netDisputes.filter(d => d.outcome === 'won')
-    return { net, total: netDisputes.length, won: netWon.length, rate: netDisputes.length > 0 ? Math.round((netWon.length / netDisputes.length) * 100) : 0 }
+    const nd  = resolved.filter(d => (d.network || '').toLowerCase() === net)
+    const nw  = nd.filter(d => d.outcome === 'won')
+    return { net, total: nd.length, won: nw.length, rate: nd.length > 0 ? Math.round((nw.length / nd.length) * 100) : 0 }
   }).filter(n => n.total > 0)
 
-  // Win rate by reason code (top 5)
   const codeMap: Record<string, { won: number; total: number }> = {}
   resolved.forEach(d => {
     const key = `${(d.network || '').toUpperCase()} ${d.reason_code}`
@@ -116,14 +123,13 @@ export default function Analytics() {
     .map(([code, { won, total }]) => ({ code, won, total, rate: Math.round((won / total) * 100) }))
     .sort((a, b) => b.total - a.total).slice(0, 6)
 
-  // Monthly trend (last 6 months)
-  const now = new Date()
+  const now    = new Date()
   const months = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
-    const label = d.toLocaleDateString('en-GB', { month: 'short' })
+    const d        = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+    const label    = d.toLocaleDateString('en-GB', { month: 'short' })
     const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const mRes  = resolved.filter(d => d.created_at?.startsWith(monthStr))
-    const mWon  = mRes.filter(d => d.outcome === 'won')
+    const mRes     = resolved.filter(d => d.created_at?.startsWith(monthStr))
+    const mWon     = mRes.filter(d => d.outcome === 'won')
     return { label, rate: mRes.length > 0 ? Math.round((mWon.length / mRes.length) * 100) : 0, count: mRes.length }
   })
 
@@ -149,15 +155,14 @@ export default function Analytics() {
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 24px 48px' }}>
         <h1 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6, letterSpacing: -0.3 }}>Win rate analytics</h1>
-        <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 24 }}>{shop}</p>
+        <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 24 }}>{shop || 'No store connected'}</p>
 
-        {/* KPI row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 28 }}>
           {[
-            { label: 'Total disputes',   value: disputes.length, sub: 'all time' },
-            { label: 'Win rate',         value: `${winRate}%`,   sub: 'of resolved disputes', color: winRate > 30 ? '#16a34a' : undefined },
-            { label: 'Total disputed',   value: `$${Math.round(totalDisputed).toLocaleString()}`, sub: 'at stake' },
-            { label: 'Revenue recovered',value: `$${Math.round(recovered).toLocaleString()}`, sub: 'from won disputes', color: '#16a34a' },
+            { label: 'Total disputes',    value: disputes.length,                                    sub: 'all time' },
+            { label: 'Win rate',          value: `${winRate}%`,                                      sub: 'of resolved disputes', color: winRate > 30 ? '#16a34a' : undefined },
+            { label: 'Total disputed',    value: `$${Math.round(totalDisputed).toLocaleString()}`,   sub: 'at stake' },
+            { label: 'Revenue recovered', value: `$${Math.round(recovered).toLocaleString()}`,       sub: 'from won disputes', color: '#16a34a' },
           ].map(s => (
             <div key={s.label} style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 12, padding: '16px 18px' }}>
               <div style={{ fontSize: 11, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>{s.label}</div>
@@ -168,8 +173,6 @@ export default function Analytics() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-
-          {/* Monthly trend */}
           <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 14, padding: 24 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 20, color: '#111827' }}>Win rate — last 6 months</div>
             {months.map(m => (
@@ -183,7 +186,6 @@ export default function Analytics() {
             ))}
           </div>
 
-          {/* By network */}
           <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 14, padding: 24 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 20, color: '#111827' }}>Win rate by network</div>
             {byNetwork.length === 0 ? (
@@ -200,7 +202,6 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* By reason code */}
         <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 14, padding: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 20, color: '#111827' }}>Win rate by reason code</div>
           {byCode.length === 0 ? (

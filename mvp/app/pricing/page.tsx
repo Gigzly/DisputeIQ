@@ -1,72 +1,89 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 const PLANS = [
   {
-    key: 'free', name: 'Free', monthly: 0, annual: 0, commission: true,
+    key: 'free', name: 'Free', monthly: 0, annual: 0,
     sub: 'No monthly fee — pay only when you win',
-    badge: null,
+    popular: false,
     features: ['Unlimited dispute responses', 'All 22 reason codes', 'CE 3.0 detection', 'Email deadline alerts', '48h reminder emails', '25% commission on won disputes only'],
-    cta: 'Get started free',
-    href: '/auth/signup',
   },
   {
-    key: 'starter', name: 'Starter', monthly: 99, annual: 83, commission: false,
+    key: 'starter', name: 'Starter', monthly: 99, annual: 83,
     sub: 'Up to 20 disputes/month · No commission',
-    badge: null,
+    popular: false,
     features: ['20 dispute responses/month', 'All 22 reason codes', 'CE 3.0 detection', 'Auto-submit to Shopify Payments', 'Email deadline alerts', 'CSV export', 'No commission on wins'],
-    cta: 'Start free trial',
-    href: '/auth/signup',
   },
   {
-    key: 'growth', name: 'Growth', monthly: 199, annual: 166, commission: false,
+    key: 'growth', name: 'Growth', monthly: 199, annual: 166,
     sub: 'Unlimited disputes · No commission',
-    badge: 'Most popular',
+    popular: true,
     features: ['Unlimited dispute responses', 'All 22 reason codes', 'CE 3.0 detection', 'Auto-submit to Shopify Payments', '48h deadline reminders', 'CSV export', 'Fraud risk monitoring', 'Priority support', 'No commission on wins'],
-    cta: 'Start free trial',
-    href: '/auth/signup',
   },
   {
-    key: 'scale', name: 'Scale', monthly: 399, annual: 332, commission: false,
+    key: 'scale', name: 'Scale', monthly: 399, annual: 332,
     sub: 'Multi-store · Up to $5M GMV',
-    badge: null,
+    popular: false,
     features: ['Everything in Growth', 'Multi-store support', 'API access', 'Dedicated onboarding', 'Slack support', 'Custom reason code rules', 'No commission on wins'],
-    cta: 'Start free trial',
-    href: '/auth/signup',
   },
 ]
 
 const FAQ = [
-  { q: 'How does the free plan work?', a: 'No monthly fee. We charge 25% commission only on disputes you win. If DisputeIQ recovers €200 for you, we invoice €50. If you lose the dispute, you pay nothing. Commission invoices are sent by email within 24 hours of marking a dispute won.' },
-  { q: 'When does it make sense to upgrade from free?', a: 'If you\'re recovering more than €396/month from won disputes, the Starter plan (€99/mo, no commission) saves you money. Use the calculator below to find your break-even point.' },
+  { q: 'How does the free plan work?', a: 'No monthly fee. We charge 25% commission only on disputes you win. If DisputeIQ recovers €200 for you, we invoice €50. If you lose the dispute, you pay nothing. Commission invoices are sent by email within 7 days of marking a dispute won.' },
+  { q: 'When does it make sense to upgrade from free?', a: "If you're recovering more than €396/month from won disputes, the Starter plan (€99/mo, no commission) saves you money. Use the calculator below to find your break-even point." },
   { q: 'Do I need a credit card to start?', a: 'No. The free plan and free trials start immediately when you connect your Shopify store. No card required until you choose a paid plan.' },
   { q: 'Does DisputeIQ submit the response for me?', a: 'On Starter, Growth, and Scale plans, we auto-submit to Shopify Payments via their API. On the free plan, we generate the response and open the right page in Shopify Payments — you paste and submit. Either way it takes under 2 minutes.' },
-  { q: 'What\'s the difference between annual and monthly?', a: 'Annual billing saves approximately 17%. Billed as one payment per year. You can cancel before renewal for a refund on unused months.' },
+  { q: "What's the difference between annual and monthly?", a: 'Annual billing saves approximately 17%. Billed as one payment per year. You can cancel before renewal for a refund on unused months.' },
   { q: 'Does it work with Stripe and PayPal?', a: 'DisputeIQ generates the evidence and response letter for any payment processor. For Stripe, we open your Stripe dashboard directly to the right dispute page. Stripe auto-submission is on the roadmap.' },
   { q: 'What if I cancel mid-month?', a: 'Monthly plans cancel at the end of the billing period — no partial refunds. Annual plans: contact conor@disputeiq.co for a prorated refund on unused months.' },
 ]
 
 export default function Pricing() {
-  const [annual, setAnnual]   = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const [recovery, setRecovery] = useState(200)
+  const [annual, setAnnual]         = useState(false)
+  const [openFaq, setOpenFaq]       = useState<number | null>(null)
+  const [recovery, setRecovery]     = useState(200)
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null)
+  const [shopId, setShopId]         = useState<string>('')
+  const [checkingOut, setCheckingOut] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadPlan = async () => {
+      const savedShop = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
+      if (!savedShop) return
+      const res = await fetch(`/api/store?shop=${encodeURIComponent(savedShop)}`)
+      if (res.ok) {
+        const { store } = await res.json()
+        if (store) {
+          setCurrentPlan(store.plan || null)
+          setShopId(store.id || '')
+        }
+      }
+    }
+    loadPlan()
+  }, [])
 
   const commissionCost = recovery * 0.25
   const starterSaving  = commissionCost - 99
   const breakEven      = Math.ceil(99 / 0.25)
 
-  const checkout = async (plan: string) => {
-    if (plan === 'free') { window.location.href = '/auth/signup'; return }
-    const urlParams = new URLSearchParams(window.location.search)
-    const shopId = urlParams.get('shop_id')
-    if (!shopId) { window.location.href = '/auth/signup'; return }
+  const checkout = async (planKey: string, skipTrial = false) => {
+    if (planKey === 'free') { window.location.href = '/auth/signup'; return }
+    const key = planKey + (skipTrial ? '_skip' : '_trial')
+    setCheckingOut(key)
+    const id = shopId || (() => {
+      const s = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
+      return s ? '' : ''
+    })()
+    if (!id) { window.location.href = '/auth/signup'; return }
     const res = await fetch('/api/checkout', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, shop_id: shopId, annual }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: planKey, shop_id: id, annual, skip_trial: skipTrial }),
     })
     const data = await res.json()
-    if (data.url) window.location.href = data.url
+    if (data.url) { window.location.href = data.url; return }
+    setCheckingOut(null)
   }
 
   return (
@@ -74,7 +91,7 @@ export default function Pricing() {
       <nav style={{ background: '#fff', borderBottom: '1px solid #f3f4f6', padding: '0 40px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontWeight: 800, fontSize: 18, textDecoration: 'none', color: '#111827' }}>Dispute<span style={{ color: '#16a34a' }}>IQ</span></Link>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <Link href="/auth/login" style={{ fontSize: 14, color: '#6b7280', textDecoration: 'none' }}>Sign in</Link>
+          <Link href="/dashboard" style={{ fontSize: 14, color: '#6b7280', textDecoration: 'none' }}>Dashboard</Link>
           <Link href="/auth/signup" style={{ background: '#16a34a', color: '#fff', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Start free</Link>
         </div>
       </nav>
@@ -103,15 +120,30 @@ export default function Pricing() {
         {/* Plan cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 48, alignItems: 'start' }}>
           {PLANS.map(plan => {
-            const price = plan.key === 'free' ? 0 : (annual ? plan.annual : plan.monthly)
+            const price     = plan.key === 'free' ? 0 : (annual ? plan.annual : plan.monthly)
+            const isCurrent = currentPlan === plan.key
+            const isPopular = plan.popular && !isCurrent
+
             return (
-              <div key={plan.key} style={{ background: '#fff', border: plan.badge ? '2px solid #16a34a' : '1px solid #e5e7eb', borderRadius: 16, padding: 24, position: 'relative' }}>
-                {plan.badge && (
-                  <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#16a34a', color: '#fff', padding: '4px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    {plan.badge}
+              <div key={plan.key} style={{
+                background: '#fff',
+                border: isCurrent ? '2px solid #2563eb' : isPopular ? '2px solid #16a34a' : '1px solid #e5e7eb',
+                borderRadius: 16, padding: 24, position: 'relative',
+              }}>
+                {/* Badge */}
+                {isCurrent && (
+                  <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#2563eb', color: '#fff', padding: '4px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    Current plan
                   </div>
                 )}
+                {!isCurrent && isPopular && (
+                  <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#16a34a', color: '#fff', padding: '4px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    Most popular
+                  </div>
+                )}
+
                 <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 600, marginBottom: 8 }}>{plan.name}</div>
+
                 {plan.key === 'free' ? (
                   <div>
                     <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1.5, marginBottom: 2 }}>€0</div>
@@ -126,7 +158,9 @@ export default function Pricing() {
                     {annual && <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>Billed €{price * 12}/year</div>}
                   </div>
                 )}
+
                 <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 20, lineHeight: 1.4 }}>{plan.sub}</div>
+
                 <ul style={{ listStyle: 'none', marginBottom: 22, padding: 0 }}>
                   {plan.features.map(f => (
                     <li key={f} style={{ fontSize: 13, color: '#374151', padding: '5px 0', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 7, alignItems: 'flex-start', lineHeight: 1.4 }}>
@@ -134,10 +168,33 @@ export default function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => checkout(plan.key)}
-                  style={{ width: '100%', padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: plan.badge ? '#16a34a' : plan.key === 'free' ? '#111827' : '#374151', color: '#fff' }}>
-                  {plan.cta}
-                </button>
+
+                {/* Action area */}
+                {isCurrent ? (
+                  <div style={{ width: '100%', padding: '12px 0', textAlign: 'center', borderRadius: 10, fontSize: 13, fontWeight: 600, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                    ✓ Your current plan
+                  </div>
+                ) : plan.key === 'free' ? (
+                  <button onClick={() => checkout('free')}
+                    style={{ width: '100%', padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: '#111827', color: '#fff' }}>
+                    Get started free
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button
+                      onClick={() => checkout(plan.key, false)}
+                      disabled={!!checkingOut}
+                      style={{ width: '100%', padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: checkingOut ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: isPopular ? '#16a34a' : '#374151', color: '#fff', opacity: checkingOut && checkingOut !== plan.key + '_trial' ? 0.6 : 1 }}>
+                      {checkingOut === plan.key + '_trial' ? 'Opening…' : 'Start 14-day trial'}
+                    </button>
+                    <button
+                      onClick={() => checkout(plan.key, true)}
+                      disabled={!!checkingOut}
+                      style={{ width: '100%', padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: checkingOut ? 'default' : 'pointer', border: '1.5px solid #e5e7eb', fontFamily: 'inherit', background: '#fff', color: '#374151', opacity: checkingOut && checkingOut !== plan.key + '_skip' ? 0.6 : 1 }}>
+                      {checkingOut === plan.key + '_skip' ? 'Opening…' : 'Subscribe now →'}
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -183,7 +240,7 @@ export default function Pricing() {
           )}
         </div>
 
-        {/* Trust */}
+        {/* Trust strip */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 28, flexWrap: 'wrap', marginBottom: 56, padding: '20px 0', borderTop: '1px solid #f3f4f6', borderBottom: '1px solid #f3f4f6' }}>
           {['14-day free trial on paid plans', 'No credit card to start', 'Cancel anytime', 'GDPR compliant', 'Irish law governing'].map(item => (
             <div key={item} style={{ fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -67,61 +67,78 @@ export default function Dashboard() {
   const [wonAnim, setWonAnim]     = useState(false)
 
   useEffect(() => {
-    const init = async () => {
-      // Shopify OAuth redirect lands here with ?shop=xxx — bypass login check
-      // Shopify OAuth redirect lands here with ?shop=xxx — bypass login check
-      const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
-      const shopParam    = searchParams?.get('shop') || null
-      if (shopParam) {
-        const shopRes = await fetch(`/api/store?shop=${encodeURIComponent(shopParam)}`)
-        if (shopRes.ok) {
-          const shopData = await shopRes.json()
-          if (shopData.store) {
-            setStore(shopData.store)
-            // Persist shop for other pages (disputes/new, analytics)
-            sessionStorage.setItem('disputeiq_shop', shopData.store.shop_domain)
-            localStorage.setItem('disputeiq_shop', shopData.store.shop_domain)
-            const dRes = await fetch(`/api/disputes?shop=${shopData.store.shop_domain}`)
-            if (dRes.ok) {
-              const dData = await dRes.json()
-              setDisputes(dData.disputes || [])
-              setStats(dData.stats || {})
-            }
-            setTab('disputes')
-            setLoading(false)
-            return
-          }
-        }
+    const applyStore = async (s: any) => {
+      setStore(s)
+      sessionStorage.setItem('disputeiq_shop', s.shop_domain)
+      localStorage.setItem('disputeiq_shop', s.shop_domain)
+      const dRes = await fetch(`/api/disputes?shop=${encodeURIComponent(s.shop_domain)}`)
+      if (dRes.ok) {
+        const d = await dRes.json()
+        setDisputes(d.disputes || [])
+        setStats(d.stats || {})
       }
+      setTab('disputes')
+      setLoading(false)
+    }
 
+    const init = async () => {
+      const searchParams = new URLSearchParams(window.location.search)
+      const shopParam    = searchParams.get('shop')
+      const savedShop    = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
+
+      // 1. Supabase session → user_id lookup (most reliable after OAuth)
       const { createSupabaseClientSide } = await import('@/lib/supabase-client')
       const supabase = createSupabaseClientSide()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/auth/login'; return }
-      setUser(user)
 
-      const res = await fetch(`/api/store?email=${encodeURIComponent(user.email || '')}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.store) {
-          setStore(data.store)
-          sessionStorage.setItem('disputeiq_shop', data.store.shop_domain)
-          localStorage.setItem('disputeiq_shop', data.store.shop_domain)
-          const dRes = await fetch(`/api/disputes?shop=${data.store.shop_domain}`)
-          if (dRes.ok) {
-            const dData = await dRes.json()
-            setDisputes(dData.disputes || [])
-            setStats(dData.stats || {})
-          }
-          setTab('disputes')
-        } else {
-          setTab('connect')
+      if (user) {
+        setUser(user)
+        const r1 = await fetch(`/api/store?user_id=${encodeURIComponent(user.id)}`)
+        if (r1.ok) {
+          const d1 = await r1.json()
+          if (d1.store) { await applyStore(d1.store); return }
         }
-      } else {
-        setTab('connect')
+        // Fallback within auth: email
+        if (user.email) {
+          const r2 = await fetch(`/api/store?email=${encodeURIComponent(user.email)}`)
+          if (r2.ok) {
+            const d2 = await r2.json()
+            if (d2.store) { await applyStore(d2.store); return }
+          }
+        }
       }
+
+      // 2. ?shop= URL param (Shopify redirect / direct link)
+      if (shopParam) {
+        const r3 = await fetch(`/api/store?shop=${encodeURIComponent(shopParam)}`)
+        if (r3.ok) {
+          const d3 = await r3.json()
+          if (d3.store) { await applyStore(d3.store); return }
+        }
+      }
+
+      // 3. localStorage / sessionStorage — never force login if we have a shop here
+      if (savedShop) {
+        const r4 = await fetch(`/api/store?shop=${encodeURIComponent(savedShop)}`)
+        if (r4.ok) {
+          const d4 = await r4.json()
+          if (d4.store) { await applyStore(d4.store); return }
+        }
+        // Shop in storage but store not in DB — stay on connect screen
+        setTab('connect')
+        setLoading(false)
+        return
+      }
+
+      // 4. No store found anywhere
+      if (!user) {
+        window.location.href = '/auth/login'
+        return
+      }
+      setTab('connect')
       setLoading(false)
     }
+
     init()
   }, [])
 

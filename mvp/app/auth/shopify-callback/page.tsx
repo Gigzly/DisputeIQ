@@ -6,26 +6,33 @@ export default function ShopifyCallback() {
 
   useEffect(() => {
     const init = async () => {
-      const params       = new URLSearchParams(window.location.search)
-      const accessToken  = params.get('access_token')
-      const refreshToken = params.get('refresh_token')
-      const shop         = params.get('shop')
+      const params = new URLSearchParams(window.location.search)
+      const shop   = params.get('shop')
 
-      // Persist shop domain for dashboard and sub-pages
+      // Persist shop domain immediately so dashboard and sub-pages can find it
       if (shop) {
         localStorage.setItem('disputeiq_shop', shop)
         sessionStorage.setItem('disputeiq_shop', shop)
       }
 
-      // Set Supabase session from the tokens the server generated
-      if (accessToken && refreshToken) {
-        setStatus('Signing you in…')
-        const { createSupabaseClientSide } = await import('@/lib/supabase-client')
-        const supabase = createSupabaseClientSide()
-        await supabase.auth.setSession({
-          access_token:  accessToken,
-          refresh_token: refreshToken,
-        })
+      // The magic link puts session tokens in the URL hash (#access_token=...&refresh_token=...).
+      // The Supabase JS client auto-detects and processes these on initialisation.
+      setStatus('Signing you in…')
+      const { createSupabaseClientSide } = await import('@/lib/supabase-client')
+      const supabase = createSupabaseClientSide()
+
+      // getSession() waits for the client to finish parsing any hash tokens
+      const { data: { session } } = await supabase.auth.getSession()
+
+      // Manual fallback: if hash parsing didn't run yet, parse it ourselves
+      if (!session) {
+        const hash       = window.location.hash.slice(1)
+        const hashParams = new URLSearchParams(hash)
+        const at         = hashParams.get('access_token')
+        const rt         = hashParams.get('refresh_token')
+        if (at && rt) {
+          await supabase.auth.setSession({ access_token: at, refresh_token: rt })
+        }
       }
 
       setStatus('Redirecting to dashboard…')

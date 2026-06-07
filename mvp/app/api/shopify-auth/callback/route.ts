@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 export async function GET(req: NextRequest) {
@@ -15,6 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/?error=missing_params`)
   }
 
+  // Verify HMAC
   const params: Record<string, string> = {}
   req.nextUrl.searchParams.forEach((val, key) => { if (key !== 'hmac') params[key] = val })
   const message = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('&')
@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${appUrl}/?error=invalid_hmac`)
   }
 
+  // Exchange code for access token
   const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
   const { access_token: shopifyToken } = await tokenRes.json()
   if (!shopifyToken) return NextResponse.redirect(`${appUrl}/?error=no_token`)
 
+  // Fetch store info from Shopify
   const shopRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
     headers: { 'X-Shopify-Access-Token': shopifyToken },
   })
@@ -41,6 +43,8 @@ export async function GET(req: NextRequest) {
   const name  = shopData?.name  || shop
 
   const admin = createSupabaseAdmin()
+
+  // Save / update store record
   await admin.from('shopify_stores').upsert({
     shop_domain:  shop,
     access_token: shopifyToken,
@@ -49,60 +53,42 @@ export async function GET(req: NextRequest) {
     plan:         'trial',
   }, { onConflict: 'shop_domain' })
 
-  // Deterministic password — derived from shop domain, never shown to the merchant
-  const deterministicPassword =
-    crypto.createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY || secret)
-      .update(shop)
-      .digest('hex')
-      .slice(0, 32) + 'Dq!'
-
-  // Use real email or a synthetic one if Shopify didn't provide one
+  // Synthetic email if Shopify didn't provide one
   const storeEmail = email || `${shop.replace(/[^a-z0-9]/gi, '-')}@noemail.disputeiq`
 
-  // Create the Supabase user (auto-confirmed) — or find the existing one
+  // Create Supabase user (auto-confirmed, no password — magic link only)
   let userId: string | undefined
   const { data: newUser } = await admin.auth.admin.createUser({
     email:         storeEmail,
-    password:      deterministicPassword,
     email_confirm: true,
   })
   if (newUser?.user) {
     userId = newUser.user.id
   } else {
-    // User already exists — find by email and reset password to stay in sync
+    // User already exists — find by listing
     const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 })
     const existing = users?.find(u => u.email === storeEmail)
-    if (existing) {
-      userId = existing.id
-      await admin.auth.admin.updateUserById(userId, { password: deterministicPassword })
-    }
+    if (existing) userId = existing.id
   }
 
-  // Link store row to the Supabase user
+  // Permanently link store row to Supabase user
   if (userId) {
     await admin.from('shopify_stores').update({ user_id: userId }).eq('shop_domain', shop)
   }
 
-  // Sign in with the anon client to obtain session tokens for the client-side callback
-  let accessToken  = ''
-  let refreshToken = ''
-  const anonClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-  const { data: signInData } = await anonClient.auth.signInWithPassword({
-    email:    storeEmail,
-    password: deterministicPassword,
+  // Generate a magic link — Supabase verifies it and passes real session tokens
+  // to our callback page via URL hash, establishing a proper persistent session
+  const callbackUrl = `${appUrl}/auth/shopify-callback?shop=${encodeURIComponent(shop)}&installed=1`
+  const { data: linkData } = await admin.auth.admin.generateLink({
+    type:    'magiclink',
+    email:   storeEmail,
+    options: { redirectTo: callbackUrl },
   })
-  accessToken  = signInData?.session?.access_token  || ''
-  refreshToken = signInData?.session?.refresh_token || ''
 
-  // Hand off to the client-side page which sets the session and redirects to dashboard
-  const dest = new URL(`${appUrl}/auth/shopify-callback`)
-  dest.searchParams.set('shop', shop)
-  dest.searchParams.set('installed', '1')
-  if (accessToken)  dest.searchParams.set('access_token', accessToken)
-  if (refreshToken) dest.searchParams.set('refresh_token', refreshToken)
+  if (linkData?.properties?.action_link) {
+    return NextResponse.redirect(linkData.properties.action_link)
+  }
 
-  return NextResponse.redirect(dest.toString())
+  // Fallback if magic link generation fails — go direct to dashboard with shop param
+  return NextResponse.redirect(`${appUrl}/dashboard?shop=${encodeURIComponent(shop)}&installed=1`)
 }

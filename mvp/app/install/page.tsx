@@ -3,24 +3,30 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 export default function Install() {
-  const [shopUrl, setShopUrl]           = useState('')
-  const [loading, setLoading]           = useState(false)
+  const [shopUrl, setShopUrl]               = useState('')
+  const [loading, setLoading]               = useState(false)
   const [autoRedirecting, setAutoRedirecting] = useState(false)
 
   useEffect(() => {
+    // Auto-redirect when the Shopify App Store passes ?shop= in the URL
     const params = new URLSearchParams(window.location.search)
     const shop   = params.get('shop')
     if (shop) {
       setAutoRedirecting(true)
+      localStorage.setItem('disputeiq_shop', shop)
+      sessionStorage.setItem('disputeiq_shop', shop)
       window.location.href = `/api/shopify-auth?shop=${encodeURIComponent(shop)}`
     }
   }, [])
 
   const install = () => {
-    if (!shopUrl.trim()) return
+    const raw = shopUrl.trim()
+    if (!raw) return
     setLoading(true)
-    let shop = shopUrl.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
+    let shop = raw.replace(/^https?:\/\//, '').replace(/\/$/, '')
     if (!shop.includes('.myshopify.com')) shop = `${shop}.myshopify.com`
+    localStorage.setItem('disputeiq_shop', shop)
+    sessionStorage.setItem('disputeiq_shop', shop)
     window.location.href = `/api/shopify-auth?shop=${encodeURIComponent(shop)}`
   }
 
@@ -58,6 +64,7 @@ export default function Install() {
               onChange={e => setShopUrl(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && install()}
               placeholder="yourstore.myshopify.com"
+              autoFocus
               style={{ flex: 1, border: '1.5px solid #e8e8e8', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', fontFamily: 'inherit', color: '#111827' }}
             />
             <button
@@ -80,8 +87,8 @@ export default function Install() {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 13, color: '#9ca3af' }}>
-          Already have an account?{' '}
-          <Link href="/auth/login" style={{ color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>Sign in</Link>
+          Already connected?{' '}
+          <Link href="/dashboard" style={{ color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>Go to dashboard →</Link>
         </p>
       </div>
     </div>

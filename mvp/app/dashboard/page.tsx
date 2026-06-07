@@ -94,11 +94,8 @@ export default function Dashboard() {
         }
       }
 
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+      const { createSupabaseClientSide } = await import('@/lib/supabase')
+      const supabase = createSupabaseClientSide()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/auth/login'; return }
       setUser(user)
@@ -129,8 +126,8 @@ export default function Dashboard() {
   }, [])
 
   const signOut = async () => {
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const { createSupabaseClientSide } = await import('@/lib/supabase')
+    const supabase = createSupabaseClientSide()
     await supabase.auth.signOut()
     window.location.href = '/auth/login'
   }

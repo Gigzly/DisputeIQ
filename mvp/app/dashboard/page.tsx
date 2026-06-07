@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [filter, setFilter]       = useState<Filter>('all')
   const [wonAnim, setWonAnim]     = useState(false)
+  const [connecting, setConnecting] = useState(false)
 
   useEffect(() => {
     const applyStore = async (s: any) => {
@@ -171,9 +172,14 @@ export default function Dashboard() {
   }
 
   const connectShopify = () => {
-    let shop = shopUrl.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
+    const raw = shopUrl.trim()
+    if (!raw || connecting) return
+    setConnecting(true)
+    let shop = raw.replace(/^https?:\/\//, '').replace(/\/$/, '')
     if (!shop.includes('.myshopify.com')) shop = `${shop}.myshopify.com`
-    window.location.href = `/api/shopify-auth?shop=${shop}`
+    localStorage.setItem('disputeiq_shop', shop)
+    sessionStorage.setItem('disputeiq_shop', shop)
+    window.location.href = `/api/shopify-auth?shop=${encodeURIComponent(shop)}`
   }
 
   const copyLetter = () => {
@@ -262,11 +268,12 @@ export default function Dashboard() {
           <div style={{ display: 'flex', gap: 10 }}>
             <input value={shopUrl} onChange={e => setShopUrl(e.target.value)}
               placeholder="yourstore.myshopify.com"
+              disabled={connecting}
               style={{ flex: 1, border: '1.5px solid #e8e8e8', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', fontFamily: 'inherit', color: '#111827' }}
               onKeyDown={e => e.key === 'Enter' && connectShopify()} />
-            <button onClick={connectShopify}
-              style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
-              Connect →
+            <button onClick={connectShopify} disabled={connecting || !shopUrl.trim()}
+              style={{ background: connecting ? '#86efac' : '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 22px', fontSize: 14, fontWeight: 600, cursor: connecting ? 'default' : 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', transition: 'background .15s' }}>
+              {connecting ? 'Connecting…' : 'Connect →'}
             </button>
           </div>
           <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>e.g. "mystore" or "mystore.myshopify.com"</p>

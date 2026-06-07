@@ -13,7 +13,7 @@ export default function Signup() {
     if (!email.includes('@')) { setError('Enter a valid email address'); return }
     if (password.length < 6)  { setError('Password must be at least 6 characters'); return }
     setError(''); setLoading(true)
-    const { createSupabaseClientSide } = await import('@/lib/supabase')
+    const { createSupabaseClientSide } = await import('@/lib/supabase-client')
     const supabase = createSupabaseClientSide()
     const { data, error: e } = await supabase.auth.signUp({ email, password })
     if (e) { setError(e.message); setLoading(false); return }

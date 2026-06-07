@@ -20,7 +20,7 @@ export default function ShopifyCallback() {
       // Set Supabase session from the tokens the server generated
       if (accessToken && refreshToken) {
         setStatus('Signing you in…')
-        const { createSupabaseClientSide } = await import('@/lib/supabase')
+        const { createSupabaseClientSide } = await import('@/lib/supabase-client')
         const supabase = createSupabaseClientSide()
         await supabase.auth.setSession({
           access_token:  accessToken,

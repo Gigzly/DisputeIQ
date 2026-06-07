@@ -94,7 +94,7 @@ export default function Dashboard() {
         }
       }
 
-      const { createSupabaseClientSide } = await import('@/lib/supabase')
+      const { createSupabaseClientSide } = await import('@/lib/supabase-client')
       const supabase = createSupabaseClientSide()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/auth/login'; return }
@@ -126,7 +126,7 @@ export default function Dashboard() {
   }, [])
 
   const signOut = async () => {
-    const { createSupabaseClientSide } = await import('@/lib/supabase')
+    const { createSupabaseClientSide } = await import('@/lib/supabase-client')
     const supabase = createSupabaseClientSide()
     await supabase.auth.signOut()
     window.location.href = '/auth/login'

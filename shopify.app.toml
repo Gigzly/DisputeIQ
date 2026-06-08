@@ -1,5 +1,6 @@
-name = "DisputeIQ" # embedded = false confirmed
+name = "DisputeIQ"
 client_id = "d7026eeb5dedde625fe7ec3d01141928"
+application_url = "https://dispute-iq-wcev.vercel.app/install"
 scopes = "read_orders,read_fulfillments,read_customers,read_disputes,read_shipping"
 embedded = false
 

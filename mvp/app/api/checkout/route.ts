@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
 
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    // Return a redirect URL instead of a 400 — client can follow it gracefully
+    return NextResponse.json({ url: `${APP_URL}/install?reason=auth_required` })
   }
 
   const admin = createSupabaseAdmin()

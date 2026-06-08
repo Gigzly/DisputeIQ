@@ -71,11 +71,26 @@ export default function Pricing() {
     if (planKey === 'free') { window.location.href = '/auth/signup'; return }
     const key = planKey + (skipTrial ? '_skip' : '_trial')
     setCheckingOut(key)
-    const id = shopId || (() => {
-      const s = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
-      return s ? '' : ''
-    })()
-    if (!id) { window.location.href = '/auth/signup'; return }
+
+    // Use cached shopId, or fetch it fresh from the stored shop domain
+    let id = shopId
+    if (!id) {
+      const savedShop = localStorage.getItem('disputeiq_shop') || sessionStorage.getItem('disputeiq_shop')
+      if (savedShop) {
+        const r = await fetch(`/api/store?shop=${encodeURIComponent(savedShop)}`)
+        if (r.ok) {
+          const { store } = await r.json()
+          if (store?.id) {
+            id = store.id
+            setShopId(store.id)
+            setCurrentPlan(store.plan || null)
+          }
+        }
+      }
+    }
+
+    if (!id) { window.location.href = '/install'; return }
+
     const res = await fetch('/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

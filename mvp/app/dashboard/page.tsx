@@ -504,6 +504,13 @@ export default function Dashboard() {
                         ? 'When a chargeback arrives, DisputeIQ detects it and generates a response within 60 seconds.'
                         : 'No disputes match this filter.'}
                     </div>
+                    {disputes.length === 0 && (
+                      <div style={{ marginTop: 20 }}>
+                        <a href="/disputes/new" style={{ display: 'inline-block', background: '#16a34a', color: '#fff', padding: '11px 22px', borderRadius: 9, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
+                          Add existing dispute manually →
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -1,4 +1,4 @@
-name = "DisputeIQ"
+name = "DisputeIQ" # embedded = false confirmed
 client_id = "d7026eeb5dedde625fe7ec3d01141928"
 scopes = "read_orders,read_fulfillments,read_customers,read_disputes,read_shipping"
 embedded = false
